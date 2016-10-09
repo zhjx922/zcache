@@ -17,8 +17,8 @@ type Cache struct {
 
 //node 单个数据节点
 type node struct {
-	key, value string
-	expire     int64
+	key, value    string
+	expire, flags int64
 }
 
 //NewCache 新建一个Cache
@@ -31,7 +31,7 @@ func NewCache(maxNode int) *Cache {
 }
 
 //Add 新增数据
-func (c *Cache) Add(key, value string, expire int64) bool {
+func (c *Cache) Add(key, value string, flags int64, expire int64) bool {
 	//记录过期时间戳
 	if expire != 0 {
 		expire += time.Now().Unix()
@@ -46,7 +46,7 @@ func (c *Cache) Add(key, value string, expire int64) bool {
 	}
 
 	//数据不存在，新建node到list
-	ne := c.llist.PushFront(&node{key, value, expire})
+	ne := c.llist.PushFront(&node{key: key, value: value, expire: expire, flags: flags})
 	c.cache[key] = ne
 
 	//@todo 节点已满，移除老数据or过期数据
@@ -61,27 +61,28 @@ func (c *Cache) Add(key, value string, expire int64) bool {
 }
 
 //Get 查询数据
-func (c *Cache) Get(key string) (value string, ok bool) {
+func (c *Cache) Get(key string) (value string, flags int64, ok bool) {
 	if e, ok := c.cache[key]; ok {
 		n := e.Value.(*node)
 		//惰性检查数据是否过期
 		if n.expire != 0 && n.expire < time.Now().Unix() {
 			c.removeElement(e)
-			return "expire", false
+			return "expire", 0, false
 		}
 		c.llist.MoveToFront(e)
-		return n.value, true
+		return n.value, n.flags, true
 	}
 
-	return "miss", false
+	return "miss", 0, false
 }
 
 //Delete 删除数据
 func (c *Cache) Delete(key string) bool {
 	if e, ok := c.cache[key]; ok {
 		c.removeElement(e)
+		return true
 	}
-	return true
+	return false
 }
 
 //removeElement 移除指定数据节点
